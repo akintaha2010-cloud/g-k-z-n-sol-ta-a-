@@ -147,12 +147,15 @@ function openTitle() {
   ] });
 }
 function openStory() {
-  const items = CHAPTERS.map((mk, i) => ({ label: (i + 1) + '. ' + (CH_TITLES[i] || 'BÖLÜM ' + (i + 1)), value: 'İZLE', fn: () => openStoryChapter(i) }));
+  const seen = save.seen || {};
+  const items = CHAPTERS.map((mk, i) => { const n = (CUTS[i] || []).filter(([id]) => seen[id]).length, open = n > 0;
+    return { label: (i + 1) + '. ' + (CH_TITLES[i] || 'BÖLÜM ' + (i + 1)), value: open ? n + '/' + (CUTS[i] || []).length : 'KİLİTLİ', disabled: !open, fn: () => openStoryChapter(i) }; });
   items.push({ label: 'GERİ', fn: openTitle });
-  setMenu('story', { title: 'HİKÂYE', note: 'AÇTIĞIN BÖLÜMLERİN SAHNELERİNİ TEKRAR İZLE', wide: true, dim: true, items, back: openTitle });
+  setMenu('story', { title: 'HİKÂYE', note: 'OYNADIKÇA AÇILAN SAHNELERİ TEKRAR İZLE', wide: true, dim: true, items, back: openTitle });
 }
 function openStoryChapter(i) {
-  const items = (CUTS[i] || []).map(([id, label]) => ({ label, value: 'İZLE', fn: () => replay(i, id) }));
+  const seen = save.seen || {};
+  const items = (CUTS[i] || []).map(([id, label]) => ({ label: seen[id] ? label : '???', value: seen[id] ? 'İZLE' : 'KİLİTLİ', disabled: !seen[id], fn: () => replay(i, id) }));
   items.push({ label: 'GERİ', fn: openStory });
   setMenu('story', { title: (i + 1) + '. ' + (CH_TITLES[i] || ''), dim: true, wide: true, items, back: openStory });
 }
@@ -362,6 +365,7 @@ function startChapter(i) {
 }
 function startCount() { count = 2.4; S.name = 'count'; S.menu = null; document.body.dataset.state = 'play'; clearInput(); }
 function runCut(id, done) {
+  if (!(save.seen ||= {})[id]) { save.seen[id] = 1; persist(); } // scenes unlock in HİKÂYE once played
   cut = createCut(world, id, VW, VH); cutDone = done;
   S.name = 'cut'; S.menu = null; S.armed = 0.35; document.body.dataset.state = 'cut'; clearInput();
   if (cut.done) endCut();
