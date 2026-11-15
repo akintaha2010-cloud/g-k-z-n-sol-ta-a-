@@ -50,10 +50,10 @@ export function drawHUD(g, w, VW, VH, t) {
 
 // generic vertical menu; returns button rects for pointer input
 export function drawMenu(g, m, VW, VH, t) {
-  const rows = m.items.length, bw = Math.min(VW - 40, m.wide ? 250 : 170), bh = 17, gap = 5;
+  const rows = m.items.length, bw = Math.min(VW - 40, m.bw || (m.wide ? 250 : 170)), bh = m.bh || 17, gap = m.gap === undefined ? 5 : m.gap;
   const totalH = rows * (bh + gap) + (m.title ? 26 : 0) + (m.note ? 14 : 0) + (m.items.some((it) => it.desc) ? 12 : 0);
   let y = Math.round(m.y !== undefined ? m.y : (VH - totalH) / 2);
-  const x = Math.round((VW - bw) / 2), rects = [];
+  const x = Math.round((VW - bw) / 2 + (m.dx || 0)), rects = [];
   if (m.dim) { g.globalAlpha = 0.72; g.fillStyle = '#0b0916'; g.fillRect(0, 0, VW, VH); g.globalAlpha = 1; }
   if (m.title) { text(g, m.title, VW / 2, y, m.titleCol || GOLD, 2, 0.5, INK); y += 26; }
   if (m.note) { text(g, m.note, VW / 2, y - 2, PAPER, 1, 0.5, INK); y += 14; }

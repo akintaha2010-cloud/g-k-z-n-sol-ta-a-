@@ -85,6 +85,44 @@ export const CHARS = {
 
 CHARS.ozgurFree = { ...CHARS.ozgur, crown: null, cape: null, expr: 'smirk' };
 
+// ---- online character creator: palettes + custom char registration (ids 'c_<hash>', cached by spec)
+export const PAL = {
+  h: [['SİYAH', '#1e1c24'], ['KAHVE', '#5a3a26'], ['KIZIL', '#b4472a'], ['SARI', '#e3b94f'], ['BEYAZ', '#e5e7eb'], ['MAVİ', '#3b82f6'], ['PEMBE', '#ec6aa8'], ['YEŞİL', '#22a05a']],
+  s: [['AÇIK', '#f5ccb0'], ['BUĞDAY', '#eab690'], ['ESMER', '#d09a74'], ['BAKIR', '#b87a52'], ['KOYU', '#8a5a3c'], ['ABANOZ', '#5e3b28']],
+  t: [['KIRMIZI', '#d9364a'], ['MAVİ', '#3b82f6'], ['YEŞİL', '#22a05a'], ['SARI', '#f0b429'], ['MOR', '#8b5cf6'], ['TURUNCU', '#f97316'], ['SİYAH', '#2b2f3b'], ['BEYAZ', '#eef2f7']],
+  p: [['SİYAH', '#22252f'], ['LACİVERT', '#1e3a8a'], ['KOT', '#4f7cb0'], ['HAKİ', '#7a7a4a'], ['GRİ', '#6b7280'], ['BORDO', '#7a2434']],
+  o: [['BEYAZ', '#f1f5f9'], ['SİYAH', '#191d26'], ['KIRMIZI', '#d9364a'], ['MAVİ', '#2563eb'], ['SARI', '#f0b429'], ['KAHVE', '#6a4129']],
+  a: [['YOK'], ['GÖZLÜK'], ['TAÇ'], ['PELERİN'], ['ŞAPKA']],
+};
+export const DEF_SPEC = { n: 'OYUNCU', h: 1, s: 1, t: 1, p: 1, o: 0, a: 0 };
+const mix = (a, b, k) => '#' + [1, 3, 5].map((i) => Math.round(parseInt(a.substr(i, 2), 16) * (1 - k) + parseInt(b.substr(i, 2), 16) * k).toString(16).padStart(2, '0')).join('');
+const tri = (c) => ({ base: c, light: mix(c, '#ffffff', 0.25), dark: mix(c, '#000000', 0.35) });
+export function cleanSpec(sp) {
+  const o = { ...DEF_SPEC, ...(sp && typeof sp === 'object' ? sp : {}) };
+  for (const k in PAL) o[k] = ((+o[k] || 0) % PAL[k].length + PAL[k].length) % PAL[k].length;
+  o.n = [...String(o.n).toLocaleUpperCase('tr')].filter((c) => /[A-ZÇĞİÖŞÜ0-9 ]/.test(c)).join('').slice(0, 12).trim() || DEF_SPEC.n;
+  return o;
+}
+// returns the char id for a spec (or passes a plain id through)
+export function makeCustom(sp) {
+  if (typeof sp === 'string') return sp;
+  sp = cleanSpec(sp);
+  const key = JSON.stringify(sp);
+  let x = 5381; for (const c of key) x = ((x * 33) ^ c.charCodeAt(0)) >>> 0;
+  const id = 'c_' + x.toString(36);
+  if (!CHARS[id]) {
+    const P = (k) => PAL[k][sp[k]][1], sk = P('s'), hc = P('h'), ac = sp.a;
+    CHARS[id] = {
+      name: sp.n, skin: { base: sk, mid: mix(sk, '#000', 0.12), dark: mix(sk, '#000', 0.28), blush: mix(sk, '#e0556a', 0.4) },
+      hair: { ...tri(hc), mid: mix(hc, '#fff', 0.12), style: 'fringe' }, brows: mix(hc, '#000', 0.5),
+      shirt: tri(P('t')), pants: tri(P('p')), shoes: { base: P('o'), sole: mix(P('o'), '#fff', 0.6) },
+      lanyard: '#15151c', expr: 'smile', sig: P('t'),
+      ...(ac === 1 ? { shades: true } : ac === 2 ? { crown: '#facc15' } : ac === 3 ? { cape: ['#db2777', '#9d174d'] } : ac === 4 ? { cap: tri(P('t')) } : {}),
+    };
+  }
+  return id;
+}
+
 function pose(ch, key, f) {
   const p = {
     ox: 0, oy: 0, hx: 0, hy: 0, lean: 0,
@@ -267,6 +305,7 @@ function face(b, ch, hx, hy, expr) {
   }
 }
 function headExtras(b, ch, hx, hy, l) {
+  if (ch.cap) { const c = ch.cap, y = hy - 9 - l; b.ell(hx, y + 3, 9, 5, c.base); b.rect(hx - 9, y + 3, 18, 3, c.base); b.rect(hx - 6, y - 1, 6, 1, c.light); b.rect(hx + 1, y + 5, 12, 2, c.dark); b.rect(hx - 9, y + 5, 10, 1, c.dark); }
   if (ch.horns) { b.rect(hx - 8, hy - 12 - l, 2, 4, ch.horns); b.set(hx - 9, hy - 13 - l, ch.horns); b.rect(hx + 6, hy - 12 - l, 2, 4, ch.horns); b.set(hx + 8, hy - 13 - l, ch.horns); }
   if (ch.crown) {
     const y = hy - 13 - l;

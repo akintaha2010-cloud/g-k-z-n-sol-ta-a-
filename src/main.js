@@ -9,6 +9,7 @@ import { CH_TITLES, CUTS } from './story.js';
 import { drawHUD, drawMenu, drawTitle, drawLobby, titleScale, drawCredits, drawCount, drawResult, drawHelp } from './ui.js';
 import { audio, unlock, sfx, music } from './audio.js';
 import * as NET from './net.js';
+import { CHARS, PAL, cleanSpec, makeCustom, sprites } from './heroes.js';
 import { createArena, stepArena, renderArena, readInputs, ROSTER } from './arena.js';
 
 const canvas = document.getElementById('game');
@@ -20,6 +21,8 @@ const SAVE_KEY = 'haven-ankara-save-v1';
 const fresh = () => ({ unlocked: 1, stickers: 0, upg: { power: 0, hp: 0, energy: 0 }, badges: {}, sfx: true, music: true });
 let save = fresh();
 try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s && s.upg) save = Object.assign(fresh(), s); } catch (e) { /* storage unavailable */ }
+let mySpec = cleanSpec(null), lastKey = '';
+try { mySpec = cleanSpec(JSON.parse(localStorage.getItem('haven-char'))); } catch (e) { /* storage unavailable */ }
 const persist = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) { /* ignore */ } };
 audio.sfx = save.sfx; audio.music = save.music;
 
@@ -53,7 +56,7 @@ function clearInput() { for (const k of ['jump', 'atk', 'kick', 'use', 'dash', '
 window.addEventListener('keydown', (e) => {
   unlock();
   if (e.repeat) { if (PRESS[e.code] || e.code.startsWith('Arrow')) e.preventDefault(); return; }
-  keys[e.code] = true;
+  keys[e.code] = true; lastKey = e.key;
   if (PRESS[e.code] || e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
   if (S.name === 'play' && PRESS[e.code]) press(PRESS[e.code]);
   uiKey(e.code);
@@ -102,6 +105,9 @@ function activate() {
 }
 function uiKey(code) {
   if (S.name === 'ajoin' && (/^(Key[A-Z]|Digit\d)$/.test(code) || code === 'Backspace')) { joinCode = NET.cleanCode(code === 'Backspace' ? joinCode.slice(0, -1) : joinCode + code.slice(-1)); return openJoin(); }
+  if (S.name === 'achar' && S.menu.sel === 0 && (lastKey.length === 1 || code === 'Backspace')) {
+    const n = code === 'Backspace' ? mySpec.n.slice(0, -1) : mySpec.n + lastKey; mySpec.n = [...n.toLocaleUpperCase('tr')].filter((c) => /[A-ZÇĞİÖŞÜ0-9 ]/.test(c)).join('').slice(0, 12); return openCreator(0);
+  }
   if (S.name === 'arena') { if (code === 'Escape' || code === 'KeyP') { if (on) openTitle(); else openArenaPause(); } return; }
   if (S.name === 'play') { if (code === 'Escape' || code === 'KeyP') openPause(); return; }
   if (S.name === 'cut') { if (S.armed <= 0 && ['Enter', 'Space', 'KeyJ', 'KeyZ'].includes(code)) cut.advance(); return; }
@@ -118,6 +124,8 @@ function uiKey(code) {
       return;
     }
   }
+  const it = m.items[m.sel], dx = { ArrowLeft: -1, ArrowRight: 1, KeyA: -1, KeyD: 1 }[code];
+  if (dx && it && it.step) { it.step(dx); return; }
   const move = (d) => { let i = m.sel; for (let k = 0; k < n; k++) { i = (i + d + n) % n; if (!m.items[i].disabled) break; } if (i !== m.sel) { m.sel = i; sfx('ui'); } };
   if (code === 'ArrowDown' || code === 'KeyS') move(1);
   else if (code === 'ArrowUp' || code === 'KeyW') move(-1);
@@ -190,10 +198,11 @@ function openHelp(back) { S.name = 'help'; S.menu = null; S.back = back; S.armed
 // ---- arena modes (KALE KAPMACA / ÇOK OYUNCULU)
 function openPicker(mode, sel = 0) {
   const o = arenaOpts = Object.assign({ rule: 'lms', char: 'akin', bots: true }, arenaOpts, { mode }), kale = mode === 'kale';
+  if (o.char.startsWith('c_')) o.char = makeCustom(mySpec);
   const again = (i) => () => { openPicker(mode, i); };
   const items = [
     { label: 'KURAL', value: o.rule === 'lms' ? 'SON KALAN KAZANIR' : 'TAÇ KAPIŞI', fn: () => { o.rule = o.rule === 'lms' ? 'crown' : 'lms'; again(0)(); } },
-    { label: 'KARAKTER', value: o.char.toUpperCase(), fn: () => { o.char = ROSTER[(ROSTER.indexOf(o.char) + 1) % ROSTER.length]; again(1)(); } },
+    { label: 'KARAKTER', value: CHARS[o.char].name, fn: () => { const i = ROSTER.indexOf(o.char) + 1; o.char = i === ROSTER.length ? makeCustom(mySpec) : ROSTER[i % ROSTER.length]; again(1)(); } },
   ];
   if (!kale) items.push({ label: 'BOTLAR', value: o.bots ? 'AÇIK' : 'KAPALI', fn: () => { o.bots = !o.bots; again(2)(); } });
   items.push({ label: 'BAŞLA', fn: () => startArena() }, { label: 'GERİ', fn: kale ? openTitle : openMulti });
@@ -213,11 +222,30 @@ function resumeArena() { S.name = 'arena'; S.menu = null; document.body.dataset.
 // ---- online (host authoritative; guests send inputs and render snapshots)
 let on = null, joinCode = '', tok = 0;
 const rd = (v) => Math.round(v * 100) / 100;
-const lobbyOf = (i) => ({ k: 'lobby', ps: on.ps.map((p) => p.char), rule: on.rule, you: i });
+const lobbyOf = (i) => ({ k: 'lobby', ps: on.ps.map((p) => p.sp || p.char), rule: on.rule, you: i });
 function openMulti() {
   setMenu('amulti', { title: 'ÇOK OYUNCULU', note: 'P1 TUŞLARI: A D W F / OKLAR', dim: true, wide: true, back: openTitle, items: [
     { label: 'ODA KUR', fn: hostRoom }, { label: 'ODAYA KATIL', fn: () => { joinCode = ''; openJoin(); } },
-    { label: 'AYNI KLAVYE', fn: () => openPicker('multi') }, { label: 'GERİ', fn: openTitle }] });
+    { label: 'KARAKTERİM', fn: () => openCreator(0) }, { label: 'AYNI KLAVYE', fn: () => openPicker('multi') }, { label: 'GERİ', fn: openTitle }] });
+}
+function openCreator(sel = 0) {
+  const row = (label, k) => ({ label, value: PAL[k][mySpec[k]][0], step: (d) => { mySpec[k] = (mySpec[k] + d + PAL[k].length) % PAL[k].length; sfx('ui'); openCreator(PAL_ROWS.indexOf(k) + 1); }, fn: () => { mySpec[k] = (mySpec[k] + 1) % PAL[k].length; openCreator(PAL_ROWS.indexOf(k) + 1); } });
+  const done = () => { mySpec = cleanSpec(mySpec); try { localStorage.setItem('haven-char', JSON.stringify(mySpec)); } catch (e) { /* ignore */ } openMulti(); };
+  const cn = S.name === 'achar' ? S.armed : 0.12;
+  setMenu('achar', { title: 'KARAKTERİNİ YAP', dim: true, back: done, bw: 142, bh: 14, gap: 3, y: 6,
+    get dx() { return Math.round(-(80 + 8) / 2); },
+    extra: (g, rs) => drawPreview(g, rs),
+    items: [{ label: 'İSİM', value: mySpec.n + (mySpec.n.length < 12 ? '_' : ''), fn: () => { if (touch.on) { const v = prompt('İSİM', mySpec.n); if (v) mySpec.n = cleanSpec({ n: v }).n; openCreator(0); } else { S.menu.sel = 1; } } },
+      row('SAÇ', 'h'), row('TEN', 's'), row('TİŞÖRT', 't'), row('PANTOLON', 'p'), row('AYAKKABI', 'o'), row('AKSESUAR', 'a'), { label: 'TAMAM', fn: done }] });
+  S.menu.sel = sel; S.armed = cn > 0 ? 0.05 : 0;
+}
+const PAL_ROWS = ['h', 's', 't', 'p', 'o', 'a'];
+function drawPreview(g, rs) {
+  const x = rs[0].x + rs[0].w + 6, y = rs[0].y, t = performance.now() / 1000, set = sprites(makeCustom(mySpec), ['idle', 'run']);
+  const run = Math.floor(t / 2) % 2, fr = run ? set.run[Math.floor(t * 10) % 6] : set.idle[Math.floor(t * 5) % 4];
+  g.fillStyle = '#141021'; g.fillRect(x - 2, y - 2, 84, 112); g.fillStyle = '#3b2d63'; g.fillRect(x, y, 80, 108); g.fillStyle = '#8a84a8'; g.fillRect(x, y + 100, 80, 8);
+  g.imageSmoothingEnabled = false; g.drawImage(fr, 12, 8, 40, 52, x, y + 4, 80, 104);
+  text(g, run ? 'KOŞU' : 'BEKLE', x + 40, y + 111, '#fde68a', 1, 0.5, '#141021');
 }
 addEventListener('pagehide', () => leaveOnline());
 function leaveOnline() { if (on) { try { on.net && on.net.close(); } catch (e) { /* ignore */ } } on = null; tok++; }
@@ -225,16 +253,17 @@ function failOnline(t) { leaveOnline(); arena = null; setMenu('aerr', { title: '
 function wait(t) { setMenu('amsg', { title: t, dim: true, back: openMulti, items: [{ label: 'GERİ', fn: () => { leaveOnline(); openMulti(); } }] }); }
 async function hostRoom() {
   leaveOnline(); const my = ++tok; wait('BAĞLANIYOR...');
-  const o = { role: 'host', ps: [{ id: null, char: (arenaOpts || {}).char || 'akin', human: true }], rule: (arenaOpts || {}).rule || 'lms', slot: 0, started: false, inp: {}, acc: 0 };
+  const o = { role: 'host', ps: [{ id: null, char: (arenaOpts || {}).char || 'akin', sp: ((arenaOpts || {}).char || '').startsWith('c_') ? mySpec : null, hi: mySpec, human: true }], rule: (arenaOpts || {}).rule || 'lms', slot: 0, started: false, inp: {}, acc: 0 };
   try {
     const net = await NET.host({
       join: (id) => {
         if (o.started || o.ps.length >= 4) { net.send(id, { k: 'full', t: o.started ? 'OYUN BAŞLAMIŞ' : 'ODA DOLU' }); return setTimeout(() => net.drop(id), 300); }
-        o.ps.push({ id, char: ROSTER[o.ps.length % ROSTER.length], human: true }); o.inp[id] = { l: 0, r: 0, j: 0, a: 0, sj: 0, sa: 0 }; sync();
+        o.ps.push({ id, char: ROSTER[o.ps.length % ROSTER.length], sp: null, human: true }); o.inp[id] = { l: 0, r: 0, j: 0, a: 0, sj: 0, sa: 0 }; sync();
       },
       msg: (id, m) => {
         const p = o.ps.find((x) => x.id === id), q = o.inp[id]; if (!p) return;
-        if (m.k === 'char' && ROSTER.includes(m.c)) { p.char = m.c; sync(); }
+        if (m.k === 'hi') { p.hi = cleanSpec(m.sp); if (p.sp) { p.sp = p.hi; p.char = makeCustom(p.sp); } sync(); }
+        else if (m.k === 'char' && (m.c === 'me' ? p.hi : ROSTER.includes(m.c))) { p.sp = m.c === 'me' ? p.hi : null; p.char = m.c === 'me' ? makeCustom(p.hi) : m.c; sync(); }
         else if (m.k === 'in') { q.l = m.l; q.r = m.r; q.j = m.j; q.a = m.a; if (m.j) q.sj = 1; if (m.a) q.sa = 1; }
       },
       leave: (id) => {
@@ -261,14 +290,14 @@ async function startJoin() {
   try {
     const net = await NET.join(code, { msg: (m) => guestMsg(o, m), closed: (t) => { if (on === o) failOnline(t); } });
     if (my !== tok) return net.close();
-    o.net = net; on = o; openRoom();
+    o.net = net; on = o; net.send({ k: 'hi', sp: mySpec }); openRoom();
   } catch (t) { if (my === tok) failOnline(String(t)); }
 }
 function guestMsg(o, m) {
   if (on !== o) return;
-  if (m.k === 'lobby') { o.ps = m.ps; o.rule = m.rule; o.slot = m.you; if (S.name === 'aroom') openRoom(); }
+  if (m.k === 'lobby') { o.ps = m.ps.map(makeCustom); o.rule = m.rule; o.slot = m.you; if (S.name === 'aroom') openRoom(); }
   else if (m.k === 'full') failOnline(m.t);
-  else if (m.k === 'start') { o.rule = m.rule; arena = createArena({ mode: 'online', rule: m.rule, slots: m.slots }); S.name = 'arena'; S.menu = null; document.body.dataset.state = 'play'; music('stage'); clearInput(); last = performance.now(); }
+  else if (m.k === 'start') { o.rule = m.rule; arena = createArena({ mode: 'online', rule: m.rule, slots: m.slots.map((s) => ({ ...s, char: makeCustom(s.char) })) }); S.name = 'arena'; S.menu = null; document.body.dataset.state = 'play'; music('stage'); clearInput(); last = performance.now(); }
   else if (m.k === 's' && arena && arena.mode === 'online' && S.name === 'arena') applySnap(arena, m);
   else if (m.k === 'over' && arena && S.name === 'arena') showArenaResult();
 }
@@ -278,18 +307,18 @@ function openRoom() {
   setMenu('aroom', { y: 4, title: o.code || 'ODA', note: 'OYUNCULAR: ' + o.ps.length + '/4', dim: true, wide: true, back: () => { leaveOnline(); openMulti(); },
     extra: (g, rs) => o.ps.forEach((p, i) => text(g, 'P' + (i + 1) + ' ' + CHARS_NAME(host ? p.char : p) + (i === o.slot ? ' (SEN)' : ''), VW / 2, rs[rs.length - 1].y + 26 + i * 9, ['#ec3750', '#38bdf8', '#a3e635', '#fbbf24'][i], 1, 0.5, '#141021')),
     items: [
-      { label: 'KARAKTER', value: String(me && (host ? me.char : me)).toUpperCase(), fn: () => { const c = ROSTER[(ROSTER.indexOf(host ? me.char : me) + 1) % ROSTER.length]; if (host) { me.char = c; o.ps.forEach((p, i) => p.id && o.net.send(p.id, lobbyOf(i))); openRoom(); } else o.net.send({ k: 'char', c }); } },
+      { label: 'KARAKTER', value: me && CHARS[host ? me.char : me].name, fn: () => { const cur = host ? me.char : me, i = ROSTER.indexOf(cur) + 1, c = i === ROSTER.length ? 'me' : ROSTER[i % ROSTER.length]; if (host) { me.sp = c === 'me' ? mySpec : null; me.char = c === 'me' ? makeCustom(mySpec) : c; o.ps.forEach((p, i) => p.id && o.net.send(p.id, lobbyOf(i))); openRoom(); } else o.net.send({ k: 'char', c }); } },
       { label: 'KURAL', value: o.rule === 'lms' ? 'SON KALAN' : 'TAÇ KAPIŞI', disabled: !host, fn: () => { o.rule = o.rule === 'lms' ? 'crown' : 'lms'; o.ps.forEach((p, i) => p.id && o.net.send(p.id, lobbyOf(i))); openRoom(); } },
       ...(host ? [{ label: 'BAŞLA', disabled: humans < 2, fn: startOnline }] : []),
       { label: 'GERİ', fn: () => { leaveOnline(); openMulti(); } }] });
   S.menu.sel = Math.min(keep, S.menu.items.length - 1); if (S.menu.items[S.menu.sel].disabled) S.menu.sel = S.menu.items.length - 1; S.armed = Math.max(0.05, armed > 0.1 ? 0.05 : armed);
 }
-const CHARS_NAME = (id) => String(id).toUpperCase();
+const CHARS_NAME = (id) => CHARS[id].name;
 function startOnline() {
   const o = on; o.started = true; o.inp = o.inp || {};
   const slots = o.ps.map((p, i) => ({ char: p.char, human: p.human, pid: p.id, me: i === 0 }));
   arena = createArena({ mode: 'online', rule: o.rule, slots });
-  o.ps.forEach((p) => p.id && o.net.send(p.id, { k: 'start', rule: o.rule, slots: slots.map((s) => ({ char: s.char, human: s.human })) }));
+  o.ps.forEach((p) => p.id && o.net.send(p.id, { k: 'start', rule: o.rule, slots: slots.map((s, i) => ({ char: o.ps[i].sp || s.char, human: s.human })) }));
   S.name = 'arena'; S.menu = null; document.body.dataset.state = 'play'; music('stage'); clearInput(); last = performance.now();
 }
 function snapOf(a) {
