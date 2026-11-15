@@ -70,9 +70,9 @@ export function createCut(w, id, VW, VH) {
       case 'cam': view.f = null; return wait(tween(view, 'x', clamp(rx(x), 0, w.pxw), typeof y === 'number' ? y : 0.8));
       case 'follow': view.f = x; break;
       case 'zoom': return wait(tween(view, 'z', x, typeof y === 'number' ? y : 0.5));
-      case 'actor': mk(x, y, rx(z), s[4]); break;
+      case 'actor': mk(x, y, clamp(rx(z), 12, w.pxw - 12), s[4]); break;
       case 'look': if (CHARS[y] && ac[x]) { ac[x].set = sprites(y); poof(ac[x]); } break;
-      case 'walk': { const o = ac[x]; if (!o) break; o.tx = rx(y); o.walking = true; if (typeof z === 'number') o.spd = z; return wait(() => o.tx === null); }
+      case 'walk': { const o = ac[x]; if (!o) break; o.tx = clamp(rx(y), 12, w.pxw - 12); o.walking = true; if (typeof z === 'number') o.spd = z; return wait(() => o.tx === null); }
       case 'jump': { const o = ac[x]; if (!o) break; o.vy = -300; o.air = true; sfx('jump'); return wait(() => !o.air); }
       case 'knock': { const o = ac[x]; if (!o) break; o.vy = -230; o.vx = -o.face * 70; o.air = true; o.anim = 'ko'; o.t0 = w.t; sfx('ko'); shk = Math.max(shk, 6); break; }
       case 'face': { const o = ac[x]; if (o) o.face = y === 'l' ? -1 : y === 'r' ? 1 : ac[y] ? Math.sign(ac[y].x - o.x) || 1 : o.face; break; }
@@ -153,7 +153,8 @@ export function createCut(w, id, VW, VH) {
       blk = exec(script[i++]);
       if (blk) break;
     }
-    // camera
+    // camera: keep whoever is talking inside the frame
+    if (bub && ac[bub.id] && !view.f) { const o = ac[bub.id], L = view.x - VW / 2 + 40, R = view.x + VW / 2 - 40, k = Math.min(1, 9 * dt); if (o.x < L) view.x += (o.x - L) * k; else if (o.x > R) view.x += (o.x - R) * k; }
     const cam = w.cam;
     cam.x = clamp(Math.round(view.x - VW / 2), 0, Math.max(0, w.pxw - VW));
     const ty = clamp(FLOOR - VH * 0.66, 0, Math.max(0, WH - VH));
@@ -268,7 +269,7 @@ export function createCut(w, id, VW, VH) {
     text(g, 'ATLA', r.x + r.w / 2, r.y + 2, PAPER, 1, 0.5);
   }
 
-  c.update = update; c.render = render; c.advance = advance; c.skip = skip;
+  c.update = update; c.dbg = () => ({ ac, bub, cx: w.cam.x, VW }); c.render = render; c.advance = advance; c.skip = skip;
   if (!script.length) finish();
   return c;
 }
