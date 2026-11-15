@@ -67,7 +67,7 @@ export const STORY = {
     ['say', 'goblin', 'TESLİM... ERTELENDİ...'],
     ['hide', 'goblin'], ['wait', 0.3],
     ['actor', 'mert', 'mert', -300, 'r'], ['actor', 'tuna', 'tuna', -340, 'r'], ['actor', 'gokoz', 'gokoz', -380, 'r'],
-    ['walk', 'mert', -110, 120, '&'], ['walk', 'tuna', -150, 120, '&'], ['walk', 'gokoz', -190, 120],
+    ['walk', 'mert', -95, 120, '&'], ['walk', 'tuna', -130, 120, '&'], ['walk', 'gokoz', -165, 120],
     ['say', 'mert', "BUG FIXED! ÖZGÜR'ÜN İZİ KIZILAY'A GİDİYOR."],
     ['say', 'tuna', 'BEN BURADA LAPTOPLARI KURTARIRIM. SEN YOLA ÇIK.'],
     ['say', 'gokoz', "BUG LORD SHOWCASE EKRANINI İSTİYOR. ÖNCE KIZILAY'I GEÇ."],
@@ -218,7 +218,7 @@ export const STORY = {
     ['bars', 0],
   ],
   ending: [
-    ['bars', 1], ['cam', 60, 0], ['screen', 130, 'off'],
+    ['bars', 1], ['cam', -30, 0], ['screen', 130, 'off'],
     ['actor', 'akin', 'akin', 'P', 'r'], ['anim', 'akin', 'win'], ['actor', 'devin', 'devin', -45, 'r'],
     ['actor', 'mert', 'mert', -330, 'r'], ['actor', 'tuna', 'tuna', -370, 'r'], ['actor', 'gokoz', 'gokoz', -410, 'r'],
     ['say', 'akin', 'BUG LORD YENİLDİ. HATA ÇÖZÜLDÜ.'],

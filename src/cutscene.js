@@ -20,7 +20,7 @@ export function createCut(w, id, VW, VH) {
   w.VW = VW; w.VH = VH;
   const p = w.player, arenas = w.lv.arenas || [], a = arenas.find((x) => x.cut === id) || (id === 'bugCrash' && arenas.find((x) => x.boss)), boss = w.enemies.find((e) => e.boss);
   let A = a ? a.x0 * TILE : id.startsWith('intro') ? w.lv.start * TILE : p.x, ctr = 0;
-  const intro = !a && id.startsWith('intro') && !w.camInit && !script.some((s) => s.some((v) => typeof v === 'string' && v[0] === '@'));
+  const intro = !a && (id.startsWith('intro') && !w.camInit || id === 'ending' || id.startsWith('outro')) && !script.some((s) => s.some((v) => typeof v === 'string' && v[0] === '@'));
   if (intro) { // the camera is pinned at the level start, so slide the whole scene to the middle of the screen instead
     const fin = {};
     for (const s of script) { const v = s[0] === 'actor' ? s[3] : s[0] === 'walk' ? s[2] : undefined; if (v !== undefined) fin[s[1]] = typeof v === 'number' ? v : /^P[+-]?\d*$/.test(v) ? +v.slice(1) || 0 : fin[s[1]]; }

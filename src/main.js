@@ -440,7 +440,7 @@ function frame(now) {
     const after = Math.ceil(count / 0.6);
     if (after !== before) sfx(after <= 1 ? 'go' : 'count');
     if (count <= 0.6 && S.name === 'count') { S.name = 'play'; clearInput(); acc = 0; }
-  } else if (S.name === 'cut') {
+  } else if (S.name === 'cut' && cut) {
     cut.touch = touch.on; cut.update(dt, keys.Escape);
     if (cut.done) endCut();
   } else if (S.name === 'credits') creditsT += dt;
