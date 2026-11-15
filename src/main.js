@@ -147,7 +147,7 @@ function openTitle() {
   ] });
 }
 function openStory() {
-  const items = CHAPTERS.map((mk, i) => ({ label: (i + 1) + '. ' + (CH_TITLES[i] || 'BÖLÜM ' + (i + 1)), value: i < save.unlocked ? 'İZLE' : 'KİLİTLİ', disabled: i >= save.unlocked, fn: () => openStoryChapter(i) }));
+  const items = CHAPTERS.map((mk, i) => ({ label: (i + 1) + '. ' + (CH_TITLES[i] || 'BÖLÜM ' + (i + 1)), value: 'İZLE', fn: () => openStoryChapter(i) }));
   items.push({ label: 'GERİ', fn: openTitle });
   setMenu('story', { title: 'HİKÂYE', note: 'AÇTIĞIN BÖLÜMLERİN SAHNELERİNİ TEKRAR İZLE', wide: true, dim: true, items, back: openTitle });
 }
@@ -163,7 +163,7 @@ function replay(i, id) {
 }
 function openChapters() {
   const items = CHAPTERS.map((mk, i) => {
-    return { label: (i + 1) + '. ' + (CH_TITLES[i] || 'BÖLÜM ' + (i + 1)), value: i < save.unlocked ? 'ROZET ' + (save.badges[i + 1] || 0) + '/2' : 'KİLİTLİ', disabled: i >= save.unlocked, fn: () => startChapter(i) };
+    return { label: (i + 1) + '. ' + (CH_TITLES[i] || 'BÖLÜM ' + (i + 1)), value: 'ROZET ' + (save.badges[i + 1] || 0) + '/2', fn: () => startChapter(i) };
   });
   items.push({ label: 'GERİ', fn: openTitle });
   setMenu('chapters', { title: 'BÖLÜM SEÇ', wide: true, dim: true, items, back: openTitle });
