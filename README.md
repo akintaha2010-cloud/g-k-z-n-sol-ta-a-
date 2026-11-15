@@ -3,6 +3,19 @@
 Hack Club Haven Ankara için yapılmış, hikâyeli 2D pixel art aksiyon-platform oyunu.
 Code jam teması **BOUNCE BACK**: Akın, maskot kirpi Devin ile birlikte Bug Lord'un kaçırdığı Özgür'ün peşine düşer. Demo çöker, ekip düşer, ama her seferinde geri sekip kalkar.
 
+## ▶ Oyna
+
+**https://akintaha2010-cloud.github.io/g-k-z-n-sol-ta-a-/**
+
+Yedek link: https://raw.githack.com/akintaha2010-cloud/g-k-z-n-sol-ta-a-/main/index.html
+
+## Modlar
+
+- **MACERA:** 5 bölümlük hikâye modu (Kapılar Açılıyor, Kızılay Kaosu, Tunalı Görevi, Sessiz Yürüyüş, Showcase Finali). Bölümler oynadıkça açılır.
+- **HİKÂYE:** Gördüğün cutscene'leri tekrar izle.
+- **KALE KAPMACA:** Kale avlusunda 3 bota karşı dövüş. "Son Kalan Kazanır" ya da "Taç Kapışı".
+- **ÇOK OYUNCULU:** Oda kodlu online maç (en fazla 4 kişi) ya da aynı klavyede iki kişi. "KARAKTERİM" ile kendi karakterini yap.
+
 **Oyna:** `index.html` dosyasını bir web sunucusundan aç (ör. GitHub Pages ya da `python3 -m http.server`).
 Derleme adımı ve bağımlılık yok; bütün grafikler ve sesler kodla üretilir.
 
