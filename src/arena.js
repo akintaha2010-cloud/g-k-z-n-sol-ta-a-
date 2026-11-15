@@ -11,12 +11,12 @@ const PLAT = [{ x0: X0, x1: X1, y: GY }, { x0: 92, x1: 152, y: 126 }, { x0: 248,
 const sgn = (v) => (v < 0 ? -1 : 1);
 
 export function createArena(o) {
-  const humans = o.mode === 'kale' ? [{ k: 'kb', pad: -1 }] : [{ k: 'kb1' }, { k: 'kb2' }, ...(o.pads || []).map((p) => ({ k: 'pad', pad: p }))].slice(0, 4);
-  const n = o.mode === 'kale' ? 4 : o.bots ? 4 : humans.length;
+  const on = o.mode === 'online', humans = on ? o.slots.map((s) => (s.human ? { k: s.me ? 'kb' : 'net', pid: s.pid } : null)) : o.mode === 'kale' ? [{ k: 'kb', pad: -1 }] : [{ k: 'kb1' }, { k: 'kb2' }, ...(o.pads || []).map((p) => ({ k: 'pad', pad: p }))].slice(0, 4);
+  const n = on ? o.slots.length : o.mode === 'kale' ? 4 : o.bots ? 4 : humans.length;
   const ids = [o.char || 'akin', ...ROSTER.filter((r) => r !== (o.char || 'akin'))];
   const a = { mode: o.mode, rule: o.rule, t: 0, count: 2.4, over: null, overT: 0, fx: [], F: [], crown: null, crownLock: 0 };
   for (let i = 0; i < n; i++) {
-    const h = humans[i], id = ids[i];
+    const h = humans[i], id = on ? o.slots[i].char : ids[i];
     a.F.push({ i, id, name: CHARS[id].name, col: COLS[i], spr: sprites(id), src: h || null, x: 130 + (140 * i) / Math.max(1, n - 1), y: GY, vx: 0, vy: 0, face: i % 2 ? -1 : 1, g: true, jumps: 2, atkT: 0, swing: 0, hitDone: true, stun: 0, inv: 0, respT: 0, alive: true,
       lives: o.rule === 'lms' ? 3 : 99, dmg: 0, crownT: 0, flash: 0, jb: 0, ab: 0, pj: false, pa: false, l: false, r: false, at: 0, ai: { t: rnd(0.1, 0.4), mv: 0, jump: false, atk: false, cd: 0, tx: 200, ty: GY } });
   }
