@@ -113,17 +113,26 @@ function drawGear(g, x, y, s, col) {
 }
 export function drawLobby(g, m, VW, VH, t) {
   const u = Math.min(VW, VH), rects = [], sel = m.sel;
-  g.fillStyle = '#2e4a6b'; g.fillRect(0, 0, VW, VH);
-  g.globalAlpha = 0.09;
+  // stepped sky bands, drifting glyph pattern, Ankara skyline behind the tiles
+  ['#1d2f4f', '#243a5e', '#2e4a6b', '#36557a'].forEach((c, i) => { g.fillStyle = c; g.fillRect(0, Math.round(VH * i / 4), VW, Math.ceil(VH / 4) + 1); });
+  g.globalAlpha = 0.08;
   const gl = ['</>', '{ }', '^.^'], cw = 40, ch = 22, ox = (t * 6) % cw, oy = (t * 3) % ch;
   for (let r = -1; r * ch < VH + ch; r++) for (let c = -1; c * cw < VW + cw; c++) text(g, gl[(r * 3 + c + 99) % 3], c * cw + (r & 1) * 20 - ox, r * ch - oy, '#9fc0ea', 1, 0);
   g.globalAlpha = 1;
-  // logo
-  const sc = VH < 250 ? 2 : 3, ly = VH < 250 ? 5 : Math.round(VH * 0.04);
-  text(g, 'HAVEN', VW / 2, ly + 2, INK, sc, 0.5); text(g, 'HAVEN', VW / 2 - 1, ly, RED, sc, 0.5); text(g, 'HAVEN', VW / 2 - 1, ly - 1, '#ff8c37', sc, 0.5);
-  g.save(); g.beginPath(); g.rect(0, ly + sc * 5, VW, 99); g.clip(); text(g, 'HAVEN', VW / 2 - 1, ly - 1, RED, sc, 0.5); g.restore();
-  text(g, 'ANKARA', VW / 2, ly + sc * 10 + 2, PAPER, sc, 0.5, INK);
-  const logoB = ly + sc * 17 + 2;
+  skyline(g, VW, VH, t);
+  // logo: chunky outlined HAVEN with a two-tone fill, ANKARA on a ribbon, slow bob
+  const sc = VH < 230 ? 3 : VH < 250 ? 4 : 5, bob = Math.round(Math.sin(t * 2) * 1.5), ly = (VH < 250 ? 6 : Math.round(VH * 0.05)) + bob;
+  logoText(g, 'HAVEN', VW / 2, ly, sc, '#ffd23f', '#ff7a1a');
+  const rw = textW('ANKARA') * 2 + 26, ry = ly + sc * 7 + 4, rx = Math.round(VW / 2 - rw / 2);
+  g.fillStyle = INK; g.fillRect(rx - 8, ry + 2, rw + 16, 20);
+  g.fillStyle = '#a3122e'; g.fillRect(rx - 6, ry + 4, 8, 16); g.fillRect(rx + rw - 2, ry + 4, 8, 16);
+  g.fillStyle = INK; g.fillRect(rx - 6, ry + 10, 3, 4); g.fillRect(rx + rw + 3, ry + 10, 3, 4);
+  g.fillStyle = INK; g.fillRect(rx - 2, ry, rw + 4, 20); g.fillStyle = RED; g.fillRect(rx, ry + 2, rw, 16); g.fillStyle = '#ff6b81'; g.fillRect(rx, ry + 2, rw, 2);
+  text(g, 'ANKARA', VW / 2, ry + 4, PAPER, 2, 0.5, INK);
+  const sp = Math.floor(t * 3) % 6; if (sp < 3) sparkle(g, VW / 2 + textW('HAVEN') * sc / 2 - 2, ly + 2, sp);
+  const logoB = ry + 22;
+  // the crew flanking the logo
+  if (VW >= 400) [['mert', -1], ['tuna', 1]].forEach(([id, d], k) => { const f = sprites(id, ['idle']).idle; const x = VW / 2 + d * (textW('HAVEN') * sc / 2 + 44) - 32; const c = f[(Math.floor(t * 5) + k * 2) % f.length]; if (d < 0) { g.save(); g.translate(Math.round(x) * 2 + 64, 0); g.scale(-1, 1); } draw64(g, c, x, ly - 6, 64); if (d < 0) g.restore(); });
   // tiles
   const gap = Math.max(4, Math.round(u * 0.02)), ts = clamp(Math.round(u * 0.3), 46, 86), rowW = ts * 3 + gap * 2, tx = Math.round((VW - rowW) / 2), ty = VH - 14 - ts;
   const band = 11, spr = Math.floor((ts - band - 6) / 1);
@@ -160,6 +169,23 @@ export function drawLobby(g, m, VW, VH, t) {
   rects.push({ x: gx - 2, y: gy - 3, w: gs + 4, h: gs + 6, i: 6 });
   text(g, 'CODE JAM TEMASI: BOUNCE BACK', VW / 2, VH - 9, '#a9bdd8', 1, 0.5, INK);
   return rects;
+}
+
+function logoText(g, str, cx, y, sc, top, bot) {
+  for (const [dx, dy] of [[-2, 0], [2, 0], [0, -2], [0, 2], [-2, -2], [2, -2], [-2, 2], [2, 2], [0, 4], [-2, 4], [2, 4]]) text(g, str, cx + dx, y + dy, INK, sc, 0.5);
+  text(g, str, cx, y, bot, sc, 0.5);
+  g.save(); g.beginPath(); g.rect(0, y, 4000, Math.round(sc * 3.5)); g.clip(); text(g, str, cx, y, top, sc, 0.5); g.restore();
+  g.save(); g.beginPath(); g.rect(0, y, 4000, 1); g.clip(); text(g, str, cx, y, '#fff7d6', sc, 0.5); g.restore();
+}
+function sparkle(g, x, y, f) { g.fillStyle = PAPER; const r = 2 + f; g.fillRect(x - r, y, r * 2 + 1, 1); g.fillRect(x, y - r, 1, r * 2 + 1); g.fillRect(x - 1, y - 1, 3, 3); }
+function skyline(g, VW, VH, t) {
+  const base = VH - 10;
+  g.fillStyle = '#1a2a46';
+  for (let x = 0, i = 0; x < VW; i++) { const w = 14 + ((i * 37) % 22), h = 18 + ((i * 53) % 34); g.fillRect(x, base - h, w, h); x += w + 2; }
+  const ax = Math.round(VW * 0.82); g.fillRect(ax - 1, base - 92, 3, 92); g.fillRect(ax - 7, base - 78, 15, 9); g.fillRect(ax - 4, base - 84, 9, 6); g.fillRect(ax, base - 104, 1, 12);
+  g.fillStyle = Math.floor(t * 2) % 2 ? '#ff4d6d' : '#7a1a2c'; g.fillRect(ax, base - 105, 1, 1);
+  g.fillStyle = '#ffd27a'; for (let i = 0; i < 26; i++) { const wx = (i * 71 + 9) % VW, wy = base - 8 - ((i * 29) % 26); if ((i + Math.floor(t / 3)) % 7) g.fillRect(wx, wy, 1, 2); }
+  g.fillStyle = '#141021'; g.fillRect(0, base, VW, 10);
 }
 function draw64(g, c, x, y, s) { const d = g.imageSmoothingEnabled; g.imageSmoothingEnabled = false; g.drawImage(c, 0, 0, c.width, c.height, Math.round(x), Math.round(y), s, s); g.imageSmoothingEnabled = d; }
 const CREDITS = [['HAVEN ANKARA', 3, GOLD], ['ÇAY, DÖNER VE CODE JAM', 1, PAPER], [], ['TEMA', 1, '#a5f3fc'], ['BOUNCE BACK', 2, PAPER], [], ['EKİP', 1, '#a5f3fc'],
