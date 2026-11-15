@@ -33,7 +33,7 @@ export async function host(cb) {
   peer.on('error', (e) => { if (!off && e.type !== 'peer-unavailable') cb.error(ERR[e.type] || GEN); });
   peer.on('disconnected', () => setTimeout(() => { if (!off && peer.disconnected && !peer.destroyed) peer.reconnect(); }, 1500));
   return {
-    code, close,
+    code, close, drop,
     send: (id, m) => { const c = conns.get(id); if (c && c.open) c.send(m); },
     all: (m, lossy) => conns.forEach((c) => { if (c.open && !(lossy && c.dataChannel && c.dataChannel.bufferedAmount > 262144)) c.send(m); }),
   };
