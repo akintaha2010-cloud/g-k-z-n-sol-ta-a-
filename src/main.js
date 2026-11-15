@@ -8,6 +8,7 @@ import { createCut } from './cutscene.js';
 import { CH_TITLES, CUTS } from './story.js';
 import { drawHUD, drawMenu, drawTitle, drawLobby, titleScale, drawCredits, drawCount, drawResult, drawHelp } from './ui.js';
 import { audio, unlock, sfx, music } from './audio.js';
+import { createArena, stepArena, renderArena, readInputs, ROSTER } from './arena.js';
 
 const canvas = document.getElementById('game');
 const g = canvas.getContext('2d');
@@ -57,8 +58,8 @@ window.addEventListener('keydown', (e) => {
   uiKey(e.code);
 });
 window.addEventListener('keyup', (e) => { keys[e.code] = false; });
-window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; touch.l = touch.r = touch.u = touch.d = touch.jump = false; if (S.name === 'play' || S.name === 'count') openPause(); });
-document.addEventListener('visibilitychange', () => { if (document.hidden && (S.name === 'play' || S.name === 'count')) openPause(); });
+window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; touch.l = touch.r = touch.u = touch.d = touch.jump = false; if (S.name === 'play' || S.name === 'count') openPause(); else if (S.name === 'arena') openArenaPause(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && (S.name === 'play' || S.name === 'count')) openPause(); else if (document.hidden && S.name === 'arena') openArenaPause(); });
 
 // touch buttons (DOM so that several fingers work at once and they can sit outside the letterbox)
 const pad = document.getElementById('pad');
@@ -68,8 +69,8 @@ function bindTouch(el, down, up) {
   el.addEventListener('pointerdown', d); el.addEventListener('pointerup', u); el.addEventListener('pointercancel', u); el.addEventListener('pointerleave', u);
 }
 for (const el of pad.querySelectorAll('[data-h]')) bindTouch(el, () => { touch[el.dataset.h] = true; if (el.dataset.h === 'jump' && S.name === 'play') press('jump'); }, () => { touch[el.dataset.h] = false; });
-for (const el of pad.querySelectorAll('[data-p]')) bindTouch(el, () => { if (S.name === 'play') press(el.dataset.p); else uiKey('Enter'); });
-bindTouch(document.getElementById('pauseBtn'), () => { if (S.name === 'play') openPause(); else if (S.name === 'pause') S.menu.items[0].fn(); });
+for (const el of pad.querySelectorAll('[data-p]')) bindTouch(el, () => { if (S.name === 'play') press(el.dataset.p); else if (S.name === 'arena') press(el.dataset.p); else uiKey('Enter'); });
+bindTouch(document.getElementById('pauseBtn'), () => { if (S.name === 'arena') openArenaPause(); else if (S.name === 'play') openPause(); else if (S.name === 'pause') S.menu.items[0].fn(); });
 window.addEventListener('touchstart', () => { if (!touch.on) { touch.on = true; document.body.classList.add('touch'); } }, { passive: true });
 
 canvas.addEventListener('pointerdown', (e) => {
@@ -88,7 +89,7 @@ canvas.addEventListener('pointermove', (e) => {
 
 // ---------------------------------------------------------------- states
 const S = { name: 'title', menu: null, rects: null, t: 0, armed: 0 };
-let world = null, demo = null, cut = null, cutDone = null, creditsT = 0, creditsDone = null, count = 0, chapter = 0;
+let arena = null, arenaOpts = null, world = null, demo = null, cut = null, cutDone = null, creditsT = 0, creditsDone = null, count = 0, chapter = 0;
 let acc = 0, last = performance.now();
 
 function setMenu(name, menu) { S.name = name; S.menu = menu; S.rects = null; S.armed = 0.25; if (menu) { menu.sel = menu.items.findIndex((i) => !i.disabled); } document.body.dataset.state = name; }
@@ -99,6 +100,7 @@ function activate() {
   sfx('ui'); it.fn();
 }
 function uiKey(code) {
+  if (S.name === 'arena') { if (code === 'Escape' || code === 'KeyP') openArenaPause(); return; }
   if (S.name === 'play') { if (code === 'Escape' || code === 'KeyP') openPause(); return; }
   if (S.name === 'cut') { if (S.armed <= 0 && ['Enter', 'Space', 'KeyJ', 'KeyZ'].includes(code)) cut.advance(); return; }
   if (S.name === 'credits') { if (S.armed <= 0 && ['Enter', 'Space', 'Escape'].includes(code)) endCredits(); return; }
@@ -122,13 +124,13 @@ function uiKey(code) {
 }
 
 function openTitle() {
-  world = null; music('menu');
+  world = null; arena = null; music('menu');
   if (!demo) { demo = createWorld(CHAPTERS[1], save, 1); demo.enemies.length = 0; demo.hint = null; }
   setMenu('title', { y: null, lobby: true, items: [
     { label: 'MACERA', fn: openChapters },
     { label: 'HİKÂYE', fn: openStory },
-    { label: 'KALE KAPMACA', fn: () => { location.href = 'kale/index.html'; } },
-    { label: 'ÇOK OYUNCULU', fn: () => { location.href = 'kale/index.html'; } },
+    { label: 'KALE KAPMACA', fn: () => openPicker('kale') },
+    { label: 'ÇOK OYUNCULU', fn: () => openPicker('multi') },
     { label: 'DÜKKÂN', fn: () => openShop(openTitle) },
     { label: 'KONTROLLER', fn: () => openHelp(openTitle) },
     { label: 'AYARLAR', fn: () => openSettings(openTitle) },
@@ -183,6 +185,35 @@ function openSettings(back) {
   build(0);
 }
 function openHelp(back) { S.name = 'help'; S.menu = null; S.back = back; S.armed = 0.3; document.body.dataset.state = 'help'; }
+// ---- arena modes (KALE KAPMACA / ÇOK OYUNCULU)
+function openPicker(mode, sel = 0) {
+  const o = arenaOpts = Object.assign({ rule: 'lms', char: 'akin', bots: true }, arenaOpts, { mode }), kale = mode === 'kale';
+  const again = (i) => () => { openPicker(mode, i); };
+  const items = [
+    { label: 'KURAL', value: o.rule === 'lms' ? 'SON KALAN KAZANIR' : 'TAÇ KAPIŞI', fn: () => { o.rule = o.rule === 'lms' ? 'crown' : 'lms'; again(0)(); } },
+    { label: 'KARAKTER', value: o.char.toUpperCase(), fn: () => { o.char = ROSTER[(ROSTER.indexOf(o.char) + 1) % ROSTER.length]; again(1)(); } },
+  ];
+  if (!kale) items.push({ label: 'BOTLAR', value: o.bots ? 'AÇIK' : 'KAPALI', fn: () => { o.bots = !o.bots; again(2)(); } });
+  items.push({ label: 'BAŞLA', fn: () => startArena() }, { label: 'GERİ', fn: openTitle });
+  setMenu('apick', { title: kale ? 'KALE KAPMACA' : 'ÇOK OYUNCULU', note: kale ? '1 OYUNCU + 3 BOT' : 'P1: A D W F   P2: OKLAR + K   + GAMEPAD', dim: true, wide: true, back: openTitle, items });
+  S.menu.sel = sel; S.armed = 0.12;
+}
+function startArena() {
+  const pads = [...((navigator.getGamepads && navigator.getGamepads()) || [])].filter(Boolean).map((p) => p.index);
+  arena = createArena(Object.assign({}, arenaOpts, { pads }));
+  S.name = 'arena'; S.menu = null; document.body.dataset.state = 'play'; music('stage'); clearInput(); last = performance.now();
+}
+function openArenaPause() {
+  if (S.name !== 'arena') return;
+  setMenu('apause', { title: 'DURAKLATILDI', dim: true, back: () => resumeArena(), items: [{ label: 'DEVAM', fn: resumeArena }, { label: 'ANA MENÜ', fn: openTitle }] });
+}
+function resumeArena() { S.name = 'arena'; S.menu = null; document.body.dataset.state = 'play'; clearInput(); last = performance.now(); }
+function showArenaResult() {
+  const w = arena.over.winner; sfx(w && w.src ? 'win' : 'lose');
+  setMenu('ares', { title: w ? w.name + ' KAZANDI!' : 'BERABERE', titleCol: w ? w.col : '#fff7ed', note: w && w.src ? 'P' + (w.i + 1) + ' ŞAMPİYON' : arena.mode === 'kale' && !arena.F[0].alive ? 'KALEYİ KAYBETTİN' : '', dim: true, items: [{ label: 'TEKRAR', fn: startArena }, { label: 'ANA MENÜ', fn: openTitle }] });
+  S.armed = 0.6;
+}
+
 function openPause() {
   if (S.name !== 'play' && S.name !== 'count') return;
   const resume = () => { S.name = 'play'; S.menu = null; document.body.dataset.state = 'play'; clearInput(); last = performance.now(); if (count > 0) S.name = 'count'; };
@@ -256,7 +287,11 @@ function frame(now) {
   if (document.hidden) return;
   S.t += dt; if (S.armed > 0) S.armed -= dt;
   const t = now / 1000;
-  if (S.name === 'play' || S.name === 'clearing') {
+  if (S.name === 'arena') {
+    stepArena(arena, readInputs(arena, keys, { l: touch.l, r: touch.r, j: touch.jump, a: inp.atk > 0 || inp.kick > 0 }), dt);
+    inp.atk -= dt; inp.kick -= dt;
+    if (arena.over && arena.overT > 1.6) showArenaResult();
+  } else if (S.name === 'play' || S.name === 'clearing') {
     acc += dt;
     let n = 0;
     while (acc >= DT && n < 5) { tick(); acc -= DT; n++; if (S.name !== 'play' && S.name !== 'clearing') { acc = 0; break; } }
@@ -277,7 +312,8 @@ function frame(now) {
   // draw
   const w = world || demo;
   if (!world) { demo.t += dt; demo.cam.x = (Math.sin(demo.t * 0.07) * 0.5 + 0.5) * Math.max(0, 1500 - VW) + 60; demo.player.x = -200; demo.devin.x = -200; demo.cam.y = Math.max(0, 288 - VH); }
-  if (S.name === 'cut' && cut) cut.render(g, VW, VH);
+  if (arena && ['arena', 'apause', 'ares'].includes(S.name)) renderArena(arena, g, VW, VH, t);
+  else if (S.name === 'cut' && cut) cut.render(g, VW, VH);
   else if (S.name === 'credits') { if (drawCredits(g, creditsT, VW, VH) && Math.floor(t * 2) % 2) text(g, touch.on ? 'DOKUN: ANA MENÜ' : 'ENTER: ANA MENÜ', VW / 2, VH - 16, '#fde68a', 1, 0.5, '#141021'); }
   else {
     render(w, g, VW, VH);
